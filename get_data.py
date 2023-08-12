@@ -17,59 +17,15 @@ import pickle
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(
-        "Update local PG repository.\n\n"
-        "This script will download all books currently not in your\n"
-        "local copy of PG and get the latest version of the metadata.\n"
-        )
-    # mirror dir
-    parser.add_argument(
-        "-m", "--mirror",
-        help="Path to the mirror folder that will be updated via rsync.",
-        default='data/.mirror/',
-        type=str)
+    parser = argparse.ArgumentParser("Update local PG repository. This script will download all books currently not in your local copy of PG and get the latest version of the metadata.")
+    parser.add_argument("--mirror", help="Path to the mirror folder that will be updated via rsync", default='data/.mirror/', type=str)
+    parser.add_argument("--raw", help="Path to the raw folder", default='data/raw/', type=str)
+    parser.add_argument("--metadata", help="Path to the metadata folder", default='metadata/', type=str)
+    parser.add_argument("--pattern", help="Patterns to get only a subset of books", default='*', type=str)
+    parser.add_argument("--keep_rdf", action="store_false", help="If there is an RDF file in metadata dir, do not overwrite it")
+    parser.add_argument("--overwrite_raw", action="store_true", help="Overwrite files in raw")
+    parser.add_argument("--quiet", action="store_true", help="Quiet mode, do not print info, warnings, etc")
 
-    # raw dir
-    parser.add_argument(
-        "-r", "--raw",
-        help="Path to the raw folder.",
-        default='data/raw/',
-        type=str)
-
-    # metadata dir
-    parser.add_argument(
-        "-M", "--metadata",
-        help="Path to the metadata folder.",
-        default='metadata/',
-        type=str)
-
-    # pattern matching
-    parser.add_argument(
-        "-p", "--pattern",
-        help="Patterns to get only a subset of books.",
-        default='*',
-        type=str)
-
-    # update argument
-    parser.add_argument(
-        "-k", "--keep_rdf",
-        action="store_false",
-        help="If there is an RDF file in metadata dir, do not overwrite it.")
-
-    # update argument
-    parser.add_argument(
-        "-owr", "--overwrite_raw",
-        action="store_true",
-        help="Overwrite files in raw.")
-
-    # quiet argument, to supress info
-    parser.add_argument(
-        "-q", "--quiet",
-        action="store_true",
-        help="Quiet mode, do not print info, warnings, etc"
-        )
-
-    # create the parser
     args = parser.parse_args()
 
     # check that all dirs exist
