@@ -55,7 +55,7 @@ def process_book(
     # get PG number
     PG_number = path_to_raw_file.split("/")[-1].split("_")[0][2:]
 
-    if overwrite_all or\
+    if overwrite_all or \
         (not os.path.isfile(os.path.join(text_dir,"PG%s_text.txt"%PG_number))) or \
         (not os.path.isfile(os.path.join(tokens_dir,"PG%s_tokens.txt"%PG_number))) or \
         (not os.path.isfile(os.path.join(counts_dir,"PG%s_counts.txt"%PG_number))):

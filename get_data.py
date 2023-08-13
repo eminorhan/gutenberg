@@ -7,7 +7,6 @@ M. Gerlach & F. Font-Clos
 """
 from src.utils import populate_raw_from_mirror, list_duplicates_in_mirror
 from src.metadataparser import make_df_metadata
-from src.bookshelves import get_bookshelves
 from src.bookshelves import parse_bookshelves
 
 import argparse

@@ -18,67 +18,24 @@ from src.utils import get_langs_dict
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(
-        "Processing raw texts from Project Gutenberg:"
-        " i) removing headers,ii) tokenizing, and iii) counting words.")
-    # raw folder
-    parser.add_argument(
-        "-r", "--raw",
-        help="Path to the raw-folder",
-        default='data/raw/',
-        type=str)
-    # text folder
-    parser.add_argument(
-        "-ote", "--output_text",
-        help="Path to text-output (text_dir)",
-        default='data/text/',
-        type=str)
-    # tokens folder
-    parser.add_argument(
-        "-oto", "--output_tokens",
-        help="Path to tokens-output (tokens_dir)",
-        default='data/tokens/',
-        type=str)
-    # counts folder
-    parser.add_argument(
-        "-oco", "--output_counts",
-        help="Path to counts-output (counts_dir)",
-        default='data/counts/',
-        type=str)
-    # pattern to specify subset of books
-    parser.add_argument(
-        "-p", "--pattern",
-        help="Patttern to specify a subset of books",
-        default='*',
-        type=str)
+    parser = argparse.ArgumentParser("Processing raw texts from Project Gutenberg: i) removing headers,ii) tokenizing, and iii) counting words.")
+    parser.add_argument("--raw", help="Path to the raw-folder", default='data/raw/', type=str)
+    parser.add_argument("--output_text", help="Path to text-output (text_dir)", default='data/text/', type=str)
+    parser.add_argument("--output_tokens", help="Path to tokens-output (tokens_dir)", default='data/tokens/', type=str)
+    parser.add_argument("--output_counts", help="Path to counts-output (counts_dir)", default='data/counts/', type=str)
+    parser.add_argument("--pattern", help="Patttern to specify a subset of books", default='*', type=str)
+    parser.add_argument("--quiet", action="store_true", help="Quiet mode, do not print info, warnings, etc")
+    parser.add_argument("--log_file", help="Path to log file", default=".log", type=str)
 
-    # quiet argument, to supress info
-    parser.add_argument(
-        "-q", "--quiet",
-        action="store_true",
-        help="Quiet mode, do not print info, warnings, etc"
-    )
-
-    # log file
-    parser.add_argument(
-        "-l", "--log_file",
-        help="Path to log file",
-        default=".log",
-        type=str)
-
-    # add arguments to parser
     args = parser.parse_args()
 
     # check whether the out-put directories exist
     if os.path.isdir(args.output_text) is False:
-        raise ValueError("The directory for output of texts '%s' "
-                         "does not exist" % (args.output_text))
+        raise ValueError("The directory for output of texts '%s' does not exist" % (args.output_text))
     if os.path.isdir(args.output_tokens) is False:
-        raise ValueError("The directory for output of tokens '%s' "
-                         "does not exist" % (args.output_tokens))
+        raise ValueError("The directory for output of tokens '%s' does not exist" % (args.output_tokens))
     if os.path.isdir(args.output_counts) is False:
-        raise ValueError("The directory for output of counts '%s' "
-                         "does not exist" % (args.output_counts))
+        raise ValueError("The directory for output of counts '%s' does not exist" % (args.output_counts))
 
     # load metadata
     metadata = pd.read_csv("metadata/metadata.csv").set_index("id")
@@ -87,41 +44,43 @@ if __name__ == '__main__':
     langs_dict = get_langs_dict()
 
     # loop over all books in the raw-folder
-    pbooks = 0
+    cbooks = 0  # completed books counter
+    pbooks = 0  # processed books counter
     for filename in glob.glob(join(args.raw, 'PG%s_raw.txt' % (args.pattern))):
-        # The process_books function will fail very rarely, whne
-        # a file tagged as UTf-8 is not really UTF-8. We kust
-        # skip those books.
+        # The process_books function will fail very rarely, when
+        # a file tagged as UTf-8 is not really UTF-8. We skip those books.
         try:
             # get PG_id
             PG_id = filename.split("/")[-1].split("_")[0]
 
-            # get language from metadata
-            # default is english
-            language = "english"
             # language is a string representing a list of languages codes
             lang_id = ast.literal_eval(metadata.loc[PG_id, "language"])[0]
-            if lang_id in langs_dict.keys():
-                language = langs_dict[lang_id]
 
-            # process the book: strip headers, tokenize, count
-            process_book(
-                path_to_raw_file=filename,
-                text_dir=args.output_text,
-                tokens_dir=args.output_tokens,
-                counts_dir=args.output_counts,
-                language=language,
-                log_file=args.log_file
-            )
-            pbooks += 1
+            # only process English books
+            if lang_id == 'en':
+                # process the book: strip headers, tokenize, count
+                process_book(
+                    path_to_raw_file=filename,
+                    text_dir=args.output_text,
+                    tokens_dir=args.output_tokens,
+                    counts_dir=args.output_counts,
+                    language="english",
+                    log_file=args.log_file
+                )
+                print(f"Processed book {PG_id}")
+                pbooks += 1
+            else:
+                print(f"Skipping book {PG_id} because it is not in English")
+
+            cbooks += 1
             if not args.quiet:
-                print("Processed %d books..." % pbooks, end="\r")
+                print(f"Gone over {cbooks} books, processed {pbooks} of them")
         except UnicodeDecodeError:
             if not args.quiet:
-                print("# WARNING: cannot process '%s' (encoding not UTF-8)" % filename)
+                print(f"# WARNING: cannot process {filename} (encoding not UTF-8)")
         except KeyError:
             if not args.quiet:
-                print("# WARNING: metadata for '%s' not found" % filename)
+                print(f"# WARNING: metadata for {filename} not found")
         except Exception as e:
             if not args.quiet:
-                print("# WARNING: cannot process '%s' (unkown error)" % filename)
+                print(f"# WARNING: cannot process {filename} (unkown error)")

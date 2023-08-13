@@ -5,9 +5,9 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=4GB
 #SBATCH --time=48:00:00
-#SBATCH --job-name=get_gutenberg
-#SBATCH --output=get_gutenberg_%A_%a.out
+#SBATCH --job-name=process_gutenberg
+#SBATCH --output=process_gutenberg_%A_%a.out
 
-srun python -u get_data.py
+srun python -u process_data.py
 
 echo "Done"
