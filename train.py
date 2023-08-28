@@ -1,0 +1,459 @@
+#!/usr/bin/env python
+# coding=utf-8
+# Copyright 2021 The HuggingFace Inc. team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+Fine-tuning the library models for causal language modeling (GPT, GPT-2, CTRL, ...)
+on a text file or a dataset without using HuggingFace Trainer.
+Here is the full list of checkpoints on the hub that can be fine-tuned by this script:
+https://huggingface.co/models?filter=text-generation
+"""
+
+import argparse
+import logging
+import math
+import os
+import random
+from itertools import chain
+
+import datasets
+import torch
+import numpy as np
+from datasets import load_dataset
+from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
+
+import transformers
+from accelerate import Accelerator, DistributedType
+from accelerate.logging import get_logger
+from accelerate.utils import set_seed
+from transformers import (
+    CONFIG_MAPPING,
+    MODEL_MAPPING,
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    default_data_collator,
+)
+from transformers.utils.versions import require_version
+
+
+logger = get_logger(__name__)
+
+require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/language-modeling/requirements.txt")
+
+MODEL_CONFIG_CLASSES = list(MODEL_MAPPING.keys())
+MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
+
+
+def get_txt_files(directory_path):
+    txt_files = []
+    
+    for root, dirs, files in os.walk(directory_path):
+        for file in files:
+            if file.endswith(".txt"):
+                txt_files.append(os.path.join(root, file))
+    
+    return txt_files
+
+
+def check_file_extensions(file_list):
+    # Extract the extension from the first file
+    extension = file_list[0].split('.')[-1]
+    
+    # Check that all files have one of the allowed extensions
+    for file_name in file_list:
+        assert file_name.endswith(('.csv', '.json', '.txt')), "Invalid file extension."
+    
+    # Check that all files have the same extension
+    for file_name in file_list:
+        assert file_name.split('.')[-1] == extension, "Files have different extensions."
+
+    print("All files have the same extension: {}.".format(extension))
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Finetune large language models on causal language modeling tasks")
+    parser.add_argument("--dataset_name", type=str, default=None, help="The name of the dataset to use (via the datasets library).")
+    parser.add_argument("--dataset_config_name", type=str, default=None, help="The configuration name of the dataset to use (via the datasets library).")
+    parser.add_argument('--train_dir', type=str, help="directory containing the training data")
+    parser.add_argument('--val_dir', type=str, help="directory containing the validation data")
+    parser.add_argument("--model_name_or_path", type=str, help="Path to pretrained model or model identifier from huggingface.co/models.", required=False)
+    parser.add_argument("--config_name", type=str, default=None, help="Pretrained config name or path if not the same as model_name")
+    parser.add_argument("--tokenizer_name", type=str, default=None, help="Pretrained tokenizer name or path if not the same as model_name")
+    parser.add_argument("--use_slow_tokenizer", action="store_true", help="If passed, will use a slow tokenizer (not backed by the 🤗 Tokenizers library).")    
+    parser.add_argument("--per_device_train_batch_size", type=int, default=8, help="Batch size (per device) for the training dataloader.")
+    parser.add_argument("--learning_rate", type=float, default=0.0001, help="Initial learning rate (after the potential warmup period) to use.")
+    parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay to use.")
+    parser.add_argument("--num_train_epochs", type=int, default=1, help="Total number of training epochs to perform.")
+    parser.add_argument("--max_train_steps", type=int, default=None, help="Total number of training steps to perform. If provided, overrides num_train_epochs.")
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Number of updates steps to accumulate before performing a backward/update pass.")
+    parser.add_argument("--output_dir", type=str, default=None, help="Where to store the final model.")
+    parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
+    parser.add_argument("--model_type", type=str, default=None, help="Model type to use if training from scratch.", choices=MODEL_TYPES)
+    parser.add_argument("--block_size", type=int, default=None, help="The training dataset will be truncated to blocks of this size (after tokenization) for training.")
+    parser.add_argument("--preprocessing_num_workers", type=int, default=None, help="The number of processes to use for the preprocessing.")
+    parser.add_argument("--overwrite_cache", action="store_true", help="Overwrite the cached training and evaluation sets")
+    parser.add_argument("--no_keep_linebreaks", action="store_true", help="Do not keep line breaks when using TXT files.")
+    parser.add_argument("--checkpointing_steps", type=str, default=None, help="Whether the various states should be saved at the end of every n steps, or 'epoch' for each epoch.")
+    parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="If the training should continue from a checkpoint folder.")
+    parser.add_argument("--save_prefix", type=str, default='', help="Informative string prefix for saving purposes.")
+    parser.add_argument("--use_pretrained_weights", action="store_true", help="Whether to use pretrained weights.")
+
+    args = parser.parse_args()
+
+    return args
+
+
+def main():
+    args = parse_args()
+    print(args)
+
+    # Initialize the accelerator
+    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
+    
+    # Make one log on every process with the configuration for debugging.
+    logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s - %(message)s", datefmt="%m/%d/%Y %H:%M:%S", level=logging.INFO)
+    logger.info(accelerator.state, main_process_only=False)
+    if accelerator.is_local_main_process:
+        datasets.utils.logging.set_verbosity_warning()
+        transformers.utils.logging.set_verbosity_info()
+    else:
+        datasets.utils.logging.set_verbosity_error()
+        transformers.utils.logging.set_verbosity_error()
+
+    # If passed along, set the training seed now.
+    if args.seed is not None:
+        set_seed(args.seed)
+
+    # Handle the repository creation
+    if accelerator.is_main_process:
+        if args.output_dir is not None:
+            os.makedirs(args.output_dir, exist_ok=True)
+    accelerator.wait_for_everyone()
+
+    train_files, val_files = get_txt_files(args.train_dir), get_txt_files(args.val_dir)
+    print(f"{len(train_files)} train files, {len(val_files)} val files")
+
+    # Sanity check for file extensions
+    check_file_extensions(train_files)
+    check_file_extensions(val_files)
+
+    # For CSV/JSON files, this script will use the column called 'text' or the first column if no column called
+    # 'text' is found. You can easily tweak this behavior (see below).
+    #
+    # In distributed training, 'load_dataset' function guarantee that only one local process can concurrently download the dataset.
+    data_files = {"train": train_files, "validation": val_files}
+    dataset_args = {}
+    extension = train_files[0].split(".")[-1]
+    if extension == "txt":
+        extension = "text"
+        dataset_args["keep_linebreaks"] = not args.no_keep_linebreaks
+    raw_datasets = load_dataset(extension, data_files=data_files, **dataset_args)
+
+    # Load pretrained model and tokenizer
+    # In distributed training, the .from_pretrained methods guarantee that only one local process can concurrently download model & vocab.
+    if args.config_name:
+        config = AutoConfig.from_pretrained(args.config_name)
+    elif args.model_name_or_path:
+        config = AutoConfig.from_pretrained(args.model_name_or_path)
+    else:
+        config = CONFIG_MAPPING[args.model_type]()
+        logger.warning("You are instantiating a new config instance from scratch.")
+
+    if args.tokenizer_name:
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=not args.use_slow_tokenizer, model_max_length=2048)
+    elif args.model_name_or_path:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=not args.use_slow_tokenizer, model_max_length=2048)
+    else:
+        raise ValueError("You are instantiating a new tokenizer from scratch. This is not supported by this script.")
+    
+    if args.model_name_or_path and args.use_pretrained_weights:
+        logger.info("Loading pretrained weights")
+        model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, from_tf=bool(".ckpt" in args.model_name_or_path), config=config)
+    else:
+        logger.info("Training new model from scratch")
+        model = AutoModelForCausalLM.from_config(config)
+
+    model.resize_token_embeddings(len(tokenizer))
+
+    # Preprocessing the datasets. First we tokenize all the texts.
+    column_names = raw_datasets["train"].column_names
+    text_column_name = "text" if "text" in column_names else column_names[0]
+
+    if args.block_size is None:
+        block_size = tokenizer.model_max_length
+        if block_size > 1024:
+            logger.warning(
+                f"The tokenizer picked seems to have a very large `model_max_length` ({tokenizer.model_max_length})."
+                "Picking 1024 instead. You can change that default value by passing --block_size xxx."
+            )
+            block_size = 1024
+    else:
+        block_size = args.block_size
+        if args.block_size > tokenizer.model_max_length:
+            logger.warning(
+                f"The block_size passed ({args.block_size}) is larger than the maximum length for the model"
+                f"({tokenizer.model_max_length}). Using block_size={tokenizer.model_max_length}."
+            )
+            block_size = tokenizer.model_max_length
+
+    print('Block size:', block_size)
+
+    def tokenize_function_original(examples):
+        return tokenizer(examples[text_column_name])
+
+    with accelerator.main_process_first():
+        tokenized_datasets = raw_datasets.map(
+            tokenize_function_original,
+            batched=True,
+            num_proc=args.preprocessing_num_workers,
+            remove_columns=column_names,
+            load_from_cache_file=not args.overwrite_cache,
+            desc="Running tokenizer on dataset",
+        )
+
+    def preprocess_function_original(examples):
+        # Concatenate all texts.
+        concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
+        total_length = len(concatenated_examples[list(examples.keys())[0]])
+        # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can customize this part to your needs
+        if total_length >= block_size:
+            total_length = (total_length // block_size) * block_size
+        # Split by chunks of max_len.
+        result = {
+            k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
+            for k, t in concatenated_examples.items()
+        }
+        result["labels"] = result["input_ids"].copy()
+        return result
+    
+    with accelerator.main_process_first():
+        lm_datasets = tokenized_datasets.map(
+            preprocess_function_original,
+            batched=True,
+            num_proc=args.preprocessing_num_workers,
+            load_from_cache_file=not args.overwrite_cache,
+            desc=f"Grouping text.",
+        )
+
+    # dataset & dataloader creation
+    train_dataset = lm_datasets["train"]
+    val_dataset = lm_datasets["validation"]
+    train_dataloader = DataLoader(train_dataset, shuffle=True, collate_fn=default_data_collator, batch_size=args.per_device_train_batch_size)
+    val_dataloader = DataLoader(val_dataset, shuffle=False, collate_fn=default_data_collator, batch_size=4*args.per_device_train_batch_size)
+
+    # Log a few random samples from the training set:
+    for index in random.sample(range(len(train_dataset)), 3):
+        logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+        logger.info(f"Sample {index} of the training set (decoded): {tokenizer.decode(train_dataset[index]['input_ids'], skip_special_tokens=False)}.")
+
+    model = accelerator.prepare(model)
+    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print("Model = %s" % str(model))
+    print('number of params (M): %.2f' % (n_parameters / 1.e6))
+
+    # Optimizer: split weights in two groups, one with weight decay and the other not.
+    no_decay = ["bias", "layer_norm.weight"]
+    optimizer_grouped_parameters = [
+        {"params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], "weight_decay": args.weight_decay},
+        {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
+    ]
+    optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=args.learning_rate)
+
+    # Scheduler and math around the number of training steps.
+    overrode_max_train_steps = False
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    if args.max_train_steps is None:
+        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+        overrode_max_train_steps = True
+
+    # Prepare everything with our `accelerator`.
+    optimizer, train_dataloader, val_dataloader = accelerator.prepare(optimizer, train_dataloader, val_dataloader)
+
+    # On TPU, the tie weights in our model have been disconnected, so we need to restore the ties.
+    if accelerator.distributed_type == DistributedType.TPU:
+        model.tie_weights()
+
+    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    if overrode_max_train_steps:
+        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+
+    # Afterwards we recalculate our number of training epochs
+    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+
+    # Figure out how many steps we should save the Accelerator states
+    checkpointing_steps = args.checkpointing_steps
+    if checkpointing_steps is not None and checkpointing_steps.isdigit():
+        checkpointing_steps = int(checkpointing_steps)
+
+    # Train!
+    total_batch_size = args.per_device_train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
+
+    logger.info("***** Running training *****")
+    logger.info(f"  Num examples = {len(train_dataset)}")
+    logger.info(f"  Num Epochs = {args.num_train_epochs}")
+    logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
+    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
+    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+    logger.info(f"  Total optimization steps = {args.max_train_steps}")
+    
+    # Only show the progress bar once on each machine.
+    progress_bar = tqdm(range(args.max_train_steps), disable=not accelerator.is_local_main_process)
+    completed_steps = 0
+    starting_epoch = 0
+
+    # Potentially load in the weights and states from a previous save
+    if args.resume_from_checkpoint:
+        if args.resume_from_checkpoint is not None or args.resume_from_checkpoint != "":
+            accelerator.print(f"Resumed from checkpoint: {args.resume_from_checkpoint}")
+            accelerator.load_state(args.resume_from_checkpoint)
+            path = os.path.basename(args.resume_from_checkpoint)
+        else:
+            # Get the most recent checkpoint
+            dirs = [f.name for f in os.scandir(os.getcwd()) if f.is_dir()]
+            dirs.sort(key=os.path.getctime)
+            path = dirs[-1]  # Sorts folders by date modified, most recent checkpoint is the last
+        # Extract `epoch_{i}` or `step_{i}`
+        training_difference = os.path.splitext(path)[0]
+
+        if "epoch" in training_difference:
+            starting_epoch = int(training_difference.replace("epoch_", "")) + 1
+            resume_step = None
+        else:
+            # need to multiply `gradient_accumulation_steps` to reflect real steps
+            resume_step = int(training_difference.replace("step_", "")) * args.gradient_accumulation_steps
+            starting_epoch = resume_step // len(train_dataloader)
+            resume_step -= starting_epoch * len(train_dataloader)
+
+    # update the progress_bar if load from checkpoint
+    progress_bar.update(starting_epoch * num_update_steps_per_epoch)
+    completed_steps = starting_epoch * num_update_steps_per_epoch
+
+    train_losses = []
+    train_losses_all = []
+    val_losses = []
+    val_losses_all = []
+
+    for epoch in range(starting_epoch, args.num_train_epochs):
+        model.train()
+        for step, batch in enumerate(train_dataloader):
+            # We need to skip steps until we reach the resumed step
+            if args.resume_from_checkpoint and epoch == starting_epoch:
+                if resume_step is not None and step < resume_step:
+                    if step % args.gradient_accumulation_steps == 0:
+                        progress_bar.update(1)
+                        completed_steps += 1
+                    continue
+
+            with accelerator.accumulate(model):
+                outputs = model(**batch)
+                loss = outputs.loss
+                # keep track of the loss at each epoch
+                train_losses.append(loss.detach().unsqueeze(0))
+                train_losses_all.append(loss.detach().unsqueeze(0))
+                accelerator.backward(loss)
+                optimizer.step()
+                optimizer.zero_grad()
+
+            # Checks if the accelerator has performed an optimization step behind the scenes
+            if accelerator.sync_gradients:
+                progress_bar.update(1)
+                completed_steps += 1
+
+            if isinstance(checkpointing_steps, int):
+                if completed_steps % checkpointing_steps == 0:
+                    output_dir = f"step_{completed_steps}"
+                    if args.output_dir is not None:
+                        output_dir = os.path.join(args.output_dir, output_dir)
+
+                    # save model and tokenizer
+                    accelerator.wait_for_everyone()
+                    unwrapped_model = accelerator.unwrap_model(model)
+                    unwrapped_model.save_pretrained(output_dir, is_main_process=accelerator.is_main_process, save_function=accelerator.save)
+                    if accelerator.is_main_process:
+                        tokenizer.save_pretrained(output_dir)
+
+                    # save train_losses
+                    train_losses_ckpt = torch.cat(train_losses)
+                    train_losses_ckpt = train_losses_ckpt.cpu().numpy()
+                    train_losses_all_ckpt = torch.cat(train_losses_all)
+                    train_losses_all_ckpt = train_losses_all_ckpt.cpu().numpy()
+                    logger.info(f"Mean train loss: {np.mean(train_losses_ckpt)}")
+
+                    # save val losses 
+                    model.eval()
+                    for step, batch in enumerate(val_dataloader):
+                        with torch.no_grad():
+                            outputs = model(**batch)
+                            loss = outputs.loss
+                            # keep track of the loss at each epoch
+                            val_losses.append(loss.detach().unsqueeze(0))
+                            val_losses_all.append(loss.detach().unsqueeze(0))
+
+                    val_losses_ckpt = torch.cat(val_losses)
+                    val_losses_ckpt = val_losses_ckpt.cpu().numpy()
+                    val_losses_all_ckpt = torch.cat(val_losses_all)
+                    val_losses_all_ckpt = val_losses_all_ckpt.cpu().numpy()
+                    logger.info(f"Mean val loss: {np.mean(val_losses_ckpt)}")
+
+                    save_path = os.path.join(output_dir, 'losses.npz')
+                    np.savez(save_path, train_losses=train_losses_all_ckpt, val_losses_ckpt=val_losses_all_ckpt, completed_steps=completed_steps)
+
+                    # re-initialize losses
+                    train_losses = []
+                    val_losses = []
+
+            if completed_steps >= args.max_train_steps:
+                break
+
+    if args.output_dir is not None:
+        # save model and tokenizer
+        accelerator.wait_for_everyone()
+        unwrapped_model = accelerator.unwrap_model(model)
+        unwrapped_model.save_pretrained(args.output_dir, is_main_process=accelerator.is_main_process, save_function=accelerator.save)
+        if accelerator.is_main_process:
+            tokenizer.save_pretrained(args.output_dir)
+
+        # save train_losses
+        train_losses_ckpt = torch.cat(train_losses)
+        train_losses_ckpt = train_losses_ckpt.cpu().numpy()
+        train_losses_all_ckpt = torch.cat(train_losses_all)
+        train_losses_all_ckpt = train_losses_all_ckpt.cpu().numpy()
+        logger.info(f"Final mean train loss (may have more variability): {np.mean(train_losses_ckpt)}")
+
+        # save val losses 
+        model.eval()
+        for step, batch in enumerate(val_dataloader):
+            with torch.no_grad():
+                outputs = model(**batch)
+                loss = outputs.loss
+                # keep track of the loss at each epoch
+                val_losses.append(loss.detach().unsqueeze(0))
+                val_losses_all.append(loss.detach().unsqueeze(0))
+
+        val_losses_ckpt = torch.cat(val_losses)
+        val_losses_ckpt = val_losses_ckpt.cpu().numpy()
+        val_losses_all_ckpt = torch.cat(val_losses_all)
+        val_losses_all_ckpt = val_losses_all_ckpt.cpu().numpy()
+        logger.info(f"Final mean val loss (may have more variability): {np.mean(val_losses_ckpt)}")
+
+        # save results
+        save_path = os.path.join(args.output_dir, args.save_prefix + '_results.npz')
+        np.savez(save_path, train_losses=train_losses_all_ckpt, val_losses_ckpt=val_losses_all_ckpt, completed_steps=completed_steps)
+
+
+if __name__ == "__main__":
+    main()

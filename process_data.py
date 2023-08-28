@@ -4,6 +4,7 @@ Process counts for all PG data.
 Written by
 M. Gerlach and F. Font-Clos
 
+Modified by Emin Orhan
 """
 import os
 from os.path import join
@@ -18,7 +19,7 @@ from src.utils import get_langs_dict
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser("Processing raw texts from Project Gutenberg: i) removing headers,ii) tokenizing, and iii) counting words.")
+    parser = argparse.ArgumentParser("Processing raw texts from Project Gutenberg: i) removing headers, ii) tokenizing, and iii) counting words.")
     parser.add_argument("--raw", help="Path to the raw-folder", default='data/raw/', type=str)
     parser.add_argument("--output_text", help="Path to text-output (text_dir)", default='data/text/', type=str)
     parser.add_argument("--output_tokens", help="Path to tokens-output (tokens_dir)", default='data/tokens/', type=str)
