@@ -30,13 +30,13 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # check whether the out-put directories exist
+    # check whether the output directories exist
     if os.path.isdir(args.output_text) is False:
-        raise ValueError("The directory for output of texts '%s' does not exist" % (args.output_text))
+        raise ValueError(f"The directory for output of texts {args.output_text} does not exist")
     if os.path.isdir(args.output_tokens) is False:
-        raise ValueError("The directory for output of tokens '%s' does not exist" % (args.output_tokens))
+        raise ValueError(f"The directory for output of tokens {args.output_tokens} does not exist")
     if os.path.isdir(args.output_counts) is False:
-        raise ValueError("The directory for output of counts '%s' does not exist" % (args.output_counts))
+        raise ValueError(f"The directory for output of counts {args.output_counts} does not exist")
 
     # load metadata
     metadata = pd.read_csv("metadata/metadata.csv").set_index("id")
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # loop over all books in the raw-folder
     cbooks = 0  # completed books counter
     pbooks = 0  # processed books counter
-    for filename in glob.glob(join(args.raw, 'PG%s_raw.txt' % (args.pattern))):
+    for filename in glob.glob(join(args.raw, f"PG{args.pattern}_raw.txt")):
         # The process_books function will fail very rarely, when
         # a file tagged as UTf-8 is not really UTF-8. We skip those books.
         try:

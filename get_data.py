@@ -1,9 +1,10 @@
 """
-Project Gutenberg parsing with python 3.
+Project Gutenberg parsing
 
 Written by
 M. Gerlach & F. Font-Clos
 
+Modified by Emin Orhan
 """
 from src.utils import populate_raw_from_mirror, list_duplicates_in_mirror
 from src.metadataparser import make_df_metadata
@@ -54,9 +55,9 @@ if __name__ == '__main__':
     # + 12345 -   0   .  t x                 t 
     #---------------------------------------------
     #        [.-][t0][x.]t[x.]    *         [t8]
-    sp_args = ["rsync", "-am%s" % vstring,
+    sp_args = ["rsync", f"-am{vstring}",
                "--include", "*/",
-               "--include", "[p123456789][g0123456789]%s[.-][t0][x.]t[x.]*[t8]" % args.pattern,
+               "--include", f"[p123456789][g0123456789]{args.pattern}[.-][t0][x.]t[x.]*[t8]",
                "--exclude", "*",
                "aleph.gutenberg.org::gutenberg", args.mirror
                ]
@@ -73,7 +74,7 @@ if __name__ == '__main__':
     # ------------------------
     # We populate 'raw_dir' hardlinking to
     # the hidden 'mirror_dir'. Names are standarized
-    # into PG12345_raw.txt form.
+    # into PG12345_raw.txt format.
     populate_raw_from_mirror(
         mirror_dir=args.mirror,
         raw_dir=args.raw,
