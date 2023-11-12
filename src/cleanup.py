@@ -34,6 +34,7 @@ TEXT_START_MARKERS = frozenset((
     "*** START OF THIS PROJECT GUTENBERG",
     "            *** START OF THE PROJECT GUTENBERG",
     "    The Project Gutenberg eBook",
+    "***The Project Gutenberg Etext",
     "This ebook is for the use of anyone anywhere in the United States",
     "*Project Gutenberg is proud to",
     "This etext was prepared by",
