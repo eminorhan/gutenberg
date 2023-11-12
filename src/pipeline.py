@@ -38,7 +38,7 @@ def process_book(
     Parameters
     ----------
     overwrite_all : bool
-        If set to True, everything is processed regargless of existing files.
+        If set to True, everything is processed regardless of existing files.
     """
     if text_dir is None:
         raise ValueError("You must specify a path to save the text files.")
@@ -59,6 +59,7 @@ def process_book(
         (not os.path.isfile(os.path.join(text_dir,"PG%s_text.txt"%PG_number))) or \
         (not os.path.isfile(os.path.join(tokens_dir,"PG%s_tokens.txt"%PG_number))) or \
         (not os.path.isfile(os.path.join(counts_dir,"PG%s_counts.txt"%PG_number))):
+
         # read raw file
         with io.open(path_to_raw_file, encoding="UTF-8") as f:
             text = f.read()

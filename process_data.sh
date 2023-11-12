@@ -8,6 +8,6 @@
 #SBATCH --job-name=process_gutenberg
 #SBATCH --output=process_gutenberg_%A_%a.out
 
-srun python -u process_data.py
+srun python -u process_data.py --overwrite
 
 echo "Done"

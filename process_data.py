@@ -26,9 +26,11 @@ if __name__ == '__main__':
     parser.add_argument("--output_counts", help="Path to counts-output (counts_dir)", default='data/counts/', type=str)
     parser.add_argument("--pattern", help="Patttern to specify a subset of books", default='*', type=str)
     parser.add_argument("--quiet", action="store_true", help="Quiet mode, do not print info, warnings, etc")
+    parser.add_argument("--overwrite", action="store_true", help="Whether to overwrite any existing processed files")
     parser.add_argument("--log_file", help="Path to log file", default=".log", type=str)
 
     args = parser.parse_args()
+    print(args)
 
     # check whether the output directories exist
     if os.path.isdir(args.output_text) is False:
@@ -65,6 +67,7 @@ if __name__ == '__main__':
                     text_dir=args.output_text,
                     tokens_dir=args.output_tokens,
                     counts_dir=args.output_counts,
+                    overwrite_all=args.overwrite,
                     language="english",
                     log_file=args.log_file
                 )
