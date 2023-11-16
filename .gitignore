@@ -2,6 +2,8 @@
 data/**/*
 metadata/**/*
 
+*.jsonl
+
 # metadata raw file
 #metadata/rdf-files.tar.bz2
 
