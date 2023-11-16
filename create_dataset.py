@@ -18,6 +18,7 @@ def read_metadata(csv_file):
                 'language': row['language'],
                 'downloads': row['downloads'],
                 'subjects': row['subjects'],
+                'document id': row['id'],
                 'type': row['type']
             }
     return data
