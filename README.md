@@ -13,8 +13,9 @@ python -u process_data.py
 ```
 This will select the English language subset of the corpus, clean up the files (removing headers and footers) and populate the `text/`, `tokens/` and `counts/` folders.
 
-3. Divide the data into a few paragraph-long chunks and add the corresponding metadata info, save all the data in one big `jsonl` file, which we can then upload to Hugging Face:
+3. Divide the data into a few paragraph-long chunks of text (ideal for generating fine-grained embeddings) and add the corresponding metadata info, save all the data in one big `jsonl` file containing ~14M records in total, which we can then upload to Hugging Face:
 ```python
 python -u create_dataset.py
 ```
 
+The November 16, 2023 snapshot of the preprocessed dataset can be accessed from [this Hugging Face repository](https://huggingface.co/datasets/eminorhan/gutenberg_en).
