@@ -3,7 +3,7 @@ import csv
 import jsonlines
 from datasets import load_dataset
 
-LENGTH_THRESHOLD = 1024
+LENGTH_THRESHOLD = 2048
 
 def read_metadata(csv_file):
     data = {}
