@@ -30,7 +30,7 @@ if __name__ == '__main__':
     parser.add_argument("--log_file", help="Path to log file", default=".log", type=str)
 
     args = parser.parse_args()
-    print(args)
+    print("Args:", args)
 
     # check whether the output directories exist
     if os.path.isdir(args.output_text) is False:

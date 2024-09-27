@@ -1,8 +1,7 @@
 """
 Project Gutenberg parsing
 
-Written by
-M. Gerlach & F. Font-Clos
+Written by M. Gerlach & F. Font-Clos
 
 Modified by Emin Orhan
 """
@@ -27,6 +26,7 @@ if __name__ == '__main__':
     parser.add_argument("--quiet", action="store_true", help="Quiet mode, do not print info, warnings, etc")
 
     args = parser.parse_args()
+    print("Args:", args)
 
     # check that all dirs exist
     if not os.path.isdir(args.mirror):

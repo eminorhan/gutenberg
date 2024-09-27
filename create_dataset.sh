@@ -11,6 +11,6 @@
 export TRANSFORMERS_CACHE="/vast/eo41/huggingface"
 export HF_DATASETS_CACHE="/vast/eo41/huggingface"
 
-srun python -u create_dataset.py
+srun python -u create_dataset.py --wholedoc
 
 echo "Done"
