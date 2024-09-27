@@ -41,9 +41,9 @@ def read_file(file_path, metadata, length_threshold):
 
 def read_file_wholedoc(file_path, metadata):
     dataset = load_dataset("text", data_files=file_path, sample_by="document")
-    for d in dataset['train']:
-        data_dict = {'text': d['text']}
-        data_dict.update(metadata)
+    assert len(dataset['train']) == 1, f"More than 1 document in file {file_path}!" 
+    data_dict = {'text': dataset['train'][0]['text']}
+    data_dict.update(metadata)
 
     return data_dict
 
@@ -51,23 +51,42 @@ def read_directory(args):
     
     csv_data = read_metadata(args.metadata_file)
 
-    all_data = []
-    for filename in os.listdir(args.directory):
+    # all_data to hold the data, lens to hold the number of words in document when args.wholedoc is True
+    all_data, lens = [], []
+
+    for filename in os.listdir(args.data_dir):
         if filename.endswith(".txt"):  # assuming you are processing text files
             file_id = filename.split('_')[0]  # assuming the file name is in the format "id_text.txt"
             if file_id in csv_data:
                 metadata = csv_data[file_id]
                 if args.wholedoc:
-                    data = read_file_wholedoc(os.path.join(args.directory, filename), metadata)
+                    data = read_file_wholedoc(os.path.join(args.data_dir, filename), metadata)
                     all_data.append(data)
+                    lens.append(len(data['text'].split()))
                 else:
-                    data = read_file(os.path.join(args.directory, filename), metadata, args.length_threshold)
+                    data = read_file(os.path.join(args.data_dir, filename), metadata, args.length_threshold)
                     all_data.extend(data)
                 print(f"File: {filename}")
             else:
                 print(f"No entry found for ID {file_id} in the CSV file.\n")
 
-    return all_data
+    return all_data, lens
+
+def random_subset_gutenberg(ds, lens, target_length=1e7):
+    
+    # shuffle indices, pick the first n articles whose word count sum exceeds target length
+    indices = np.random.permutation(len(ds))
+    lens_shuffled_cumsum = np.cumsum(lens[indices])
+    n = np.searchsorted(lens_shuffled_cumsum, target_length, side="left")
+    selected_indices = indices[:n]
+
+    # select subset with given indices
+    ds_selected = ds[selected_indices]
+    print(f"========= Target length: {target_length} =========")
+    print(f"Total number of documents selected: {n-1}")
+    print(f"Total number of words: {lens_shuffled_cumsum[n-1]}")
+
+    return ds_selected
 
 if __name__ == "__main__":
 
@@ -80,10 +99,20 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"Args: {args}")
     
-    all_data = read_directory(args)
-    print(f"all_data length (number of records in dataset): {len(all_data)}")
+    all_data, lens = read_directory(args)
+    print(f"Total number of records in dataset: {len(all_data)}")
+    if args.wholedoc:
+        ds_10M = random_subset_gutenberg(all_data, lens, target_length=1e7)  # 10M word subset
+        ds_100M = random_subset_gutenberg(all_data, lens, target_length=1e8)  # 100M word subset
 
     # write to jsonl file
-    output_filename = f"gutenberg_en_wholedoc.jsonl" if args.wholedoc == True else f"gutenberg_en_paragraph_{args.length_threshold}.jsonl"
-    with jsonlines.open(f"gutenberg_en_paragraph_{args.length_threshold}.jsonl", mode='w') as writer:
+    output_filename = "gutenberg_en.jsonl" if args.wholedoc == True else f"gutenberg_en_paragraph_{args.length_threshold}.jsonl"
+    with jsonlines.open(output_filename, mode='w') as writer:
         writer.write_all(all_data)
+
+    if args.wholedoc:
+        with jsonlines.open("gutenberg_en_10M.jsonl", mode='w') as writer_10M:
+            writer_10M.write_all(ds_10M)
+
+        with jsonlines.open("gutenberg_en_100M.jsonl", mode='w') as writer_100M:
+            writer_100M.write_all(ds_100M)
