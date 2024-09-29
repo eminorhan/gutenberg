@@ -1,6 +1,5 @@
 import os
 import csv
-import jsonlines
 import argparse
 import numpy as np
 from datasets import load_dataset, Dataset
@@ -110,10 +109,13 @@ if __name__ == "__main__":
         ds_100M, ds_100M_val = random_subset_gutenberg(ds, lens, target_length=1e8)  # 100M word subset
 
     ds = Dataset.from_list(ds)
+    print("Generated dataset ds")
     ds_10M = Dataset.from_list(ds_10M)
-    ds_100M = Dataset.from_list(ds_100M)
     ds_10M_val = Dataset.from_list(ds_10M_val)
+    print("Generated dataset ds_10M")
+    ds_100M = Dataset.from_list(ds_100M)
     ds_100M_val = Dataset.from_list(ds_100M_val)
+    print("Generated dataset ds_100M")
 
     # push subset to hub
     ds.push_to_hub("eminorhan/gutenberg_en_sep24", "all", split="train", token=True)
@@ -121,15 +123,3 @@ if __name__ == "__main__":
     ds_10M_val.push_to_hub("eminorhan/gutenberg_en_sep24", "10M", split="validation", token=True)
     ds_100M.push_to_hub("eminorhan/gutenberg_en_sep24", "100M", split="train", token=True)
     ds_100M_val.push_to_hub("eminorhan/gutenberg_en_sep24", "100M", split="validation", token=True)
-
-    # # write to jsonl file
-    # output_filename = "gutenberg_en.jsonl" if args.wholedoc == True else f"gutenberg_en_paragraph_{args.length_threshold}.jsonl"
-    # with jsonlines.open(output_filename, mode='w') as writer:
-    #     writer.write_all(all_data)
-
-    # if args.wholedoc:
-    #     with jsonlines.open("gutenberg_en_10M.jsonl", mode='w') as writer_10M:
-    #         writer_10M.write_all(ds_10M)
-
-    #     with jsonlines.open("gutenberg_en_100M.jsonl", mode='w') as writer_100M:
-    #         writer_100M.write_all(ds_100M)

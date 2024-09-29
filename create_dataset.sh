@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=128GB
+#SBATCH --mem=240GB
 #SBATCH --time=2:00:00
 #SBATCH --job-name=create_gutenberg_en
 #SBATCH --output=create_gutenberg_en_%A_%a.out
