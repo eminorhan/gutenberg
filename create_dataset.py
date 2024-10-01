@@ -22,14 +22,14 @@ def read_metadata(csv_file):
             }
     return data
 
-def read_file(file_path, metadata, length_threshold):
+def read_file(file_path, metadata, chunk_length):
     dataset = load_dataset("text", data_files=file_path, sample_by="paragraph")
     temp = ''
     all_data = []
     for d in dataset['train']:
         p = d['text']
         temp = temp + '\n' + p
-        if len(temp) > length_threshold:
+        if len(temp) > chunk_length:
             temp_dict = {'text': temp}
             temp_dict.update(metadata)
             all_data.append(temp_dict)
@@ -64,7 +64,7 @@ def read_directory(args):
                     all_data.append(data)
                     lens.append(len(data['text'].split()))
                 else:
-                    data = read_file(os.path.join(args.data_dir, filename), metadata, args.length_threshold)
+                    data = read_file(os.path.join(args.data_dir, filename), metadata, args.chunk_length)
                     all_data.extend(data)
                 print(f"File: {filename}")
             else:
@@ -96,8 +96,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("Creating a dataset from processed Gutenberg texts.")
     parser.add_argument("--data_dir", help="Path to text data", default='data/text', type=str)
     parser.add_argument("--metadata_file", help="Path to metadata file", default='metadata/metadata.csv', type=str)
-    parser.add_argument('--length_threshold', help="Length threshold to use when chunking texts (number of characters)", default=1024, type=int)
-    parser.add_argument('--wholedoc', action='store_true', help="Whether to use whole documents instead of chunking texts into equal length units (default: false)")
+    parser.add_argument('--chunk_length', help="Chunk length to use when chunking texts (number of characters)", default=1024, type=int)
+    parser.add_argument('--wholedoc', action='store_true', help="Whether to save whole documents instead of chunking texts into equal length units (default: false)")
 
     args = parser.parse_args()
     print(f"Args: {args}")
