@@ -22,4 +22,4 @@ or alternatively save the whole document as a single record without chunking it 
 python -u create_dataset.py --wholedoc
 ```
 
-The November 16, 2023 snapshot of the preprocessed dataset, containing ~14M records in total from 56712 documents, can be accessed from [this Hugging Face repository](https://huggingface.co/datasets/eminorhan/gutenberg_en).
+December 10, 2024 snapshot of the preprocessed dataset, containing a total of 58477 documents, together with 10M and 100M-word subsets of the full data (to be used for the BabyLM challenge), can be accessed from [this Hugging Face repository](https://huggingface.co/datasets/eminorhan/gutenberg_en_dec24).
