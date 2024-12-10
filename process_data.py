@@ -51,7 +51,7 @@ if __name__ == '__main__':
     pbooks = 0  # processed books counter
     for filename in glob.glob(join(args.raw, f"PG{args.pattern}_raw.txt")):
         # The process_books function will fail very rarely, when
-        # a file tagged as UTf-8 is not really UTF-8. We skip those books.
+        # a file tagged as UTF-8 is not really UTF-8. We skip those books.
         try:
             # get PG_id
             PG_id = filename.split("/")[-1].split("_")[0]

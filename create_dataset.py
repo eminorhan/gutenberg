@@ -105,21 +105,46 @@ if __name__ == "__main__":
     ds, lens = read_directory(args)
     print(f"Total number of records in dataset: {len(ds)}")
     if args.wholedoc:
-        ds_10M, ds_10M_val = random_subset_gutenberg(ds, lens, target_length=1e7)  # 10M word subset
-        ds_100M, ds_100M_val = random_subset_gutenberg(ds, lens, target_length=1e8)  # 100M word subset
+        ds_10M_1, ds_10M_1_val = random_subset_gutenberg(ds, lens, target_length=1e7)  # 10M word subset
+        ds_10M_2, ds_10M_2_val = random_subset_gutenberg(ds, lens, target_length=1e7)  # 10M word subset
+        ds_10M_3, ds_10M_3_val = random_subset_gutenberg(ds, lens, target_length=1e7)  # 10M word subset
+
+        ds_100M_1, ds_100M_1_val = random_subset_gutenberg(ds, lens, target_length=1e8)  # 100M word subset
+        ds_100M_2, ds_100M_2_val = random_subset_gutenberg(ds, lens, target_length=1e8)  # 100M word subset
+        ds_100M_3, ds_100M_3_val = random_subset_gutenberg(ds, lens, target_length=1e8)  # 100M word subset
 
     ds = Dataset.from_list(ds)
     print("Generated dataset ds")
-    ds_10M = Dataset.from_list(ds_10M)
-    ds_10M_val = Dataset.from_list(ds_10M_val)
-    print("Generated dataset ds_10M")
-    ds_100M = Dataset.from_list(ds_100M)
-    ds_100M_val = Dataset.from_list(ds_100M_val)
+
+    ds_10M_1, ds_10M_1_val = Dataset.from_list(ds_10M_1), Dataset.from_list(ds_10M_1_val)
+    ds_10M_2, ds_10M_2_val = Dataset.from_list(ds_10M_2), Dataset.from_list(ds_10M_2_val)
+    ds_10M_3, ds_10M_3_val = Dataset.from_list(ds_10M_3), Dataset.from_list(ds_10M_3_val)
+    print("Generated datasets ds_10M")
+    
+    ds_100M_1, ds_100M_1_val = Dataset.from_list(ds_100M_1), Dataset.from_list(ds_100M_1_val)
+    ds_100M_2, ds_100M_2_val = Dataset.from_list(ds_100M_2), Dataset.from_list(ds_100M_2_val)
+    ds_100M_3, ds_100M_3_val = Dataset.from_list(ds_100M_3), Dataset.from_list(ds_100M_3_val)
     print("Generated dataset ds_100M")
 
-    # push subset to hub
-    ds.push_to_hub("eminorhan/gutenberg_en_sep24", "all", split="train", token=True)
-    ds_10M.push_to_hub("eminorhan/gutenberg_en_sep24", "10M", split="train", token=True)
-    ds_10M_val.push_to_hub("eminorhan/gutenberg_en_sep24", "10M", split="validation", token=True)
-    ds_100M.push_to_hub("eminorhan/gutenberg_en_sep24", "100M", split="train", token=True)
-    ds_100M_val.push_to_hub("eminorhan/gutenberg_en_sep24", "100M", split="validation", token=True)
+    # push full data to hub
+    ds.push_to_hub("eminorhan/gutenberg_en_dec24", "all", split="train", token=True)
+
+    # push 10M subsets to hub
+    ds_10M_1.push_to_hub("eminorhan/gutenberg_en_dec24", "10M_1", split="train", token=True)
+    ds_10M_1_val.push_to_hub("eminorhan/gutenberg_en_dec24", "10M_1", split="validation", token=True)
+
+    ds_10M_2.push_to_hub("eminorhan/gutenberg_en_dec24", "10M_2", split="train", token=True)
+    ds_10M_2_val.push_to_hub("eminorhan/gutenberg_en_dec24", "10M_2", split="validation", token=True)
+
+    ds_10M_3.push_to_hub("eminorhan/gutenberg_en_dec24", "10M_3", split="train", token=True)
+    ds_10M_3_val.push_to_hub("eminorhan/gutenberg_en_dec24", "10M_3", split="validation", token=True)
+
+    # push 100M subsets to hub
+    ds_100M_1.push_to_hub("eminorhan/gutenberg_en_dec24", "100M_1", split="train", token=True)
+    ds_100M_1_val.push_to_hub("eminorhan/gutenberg_en_dec24", "100M_1", split="validation", token=True)
+
+    ds_100M_2.push_to_hub("eminorhan/gutenberg_en_dec24", "100M_2", split="train", token=True)
+    ds_100M_2_val.push_to_hub("eminorhan/gutenberg_en_dec24", "100M_2", split="validation", token=True)
+
+    ds_100M_3.push_to_hub("eminorhan/gutenberg_en_dec24", "100M_3", split="train", token=True)
+    ds_100M_3_val.push_to_hub("eminorhan/gutenberg_en_dec24", "100M_3", split="validation", token=True)
