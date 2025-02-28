@@ -11,7 +11,7 @@ This will download a copy of all UTF-8 books in the Project Gutenberg corpus and
 ```python
 python -u process_data.py
 ```
-This will clean up the files (removing headers and footers) and populate the `text/`, `tokens/` and `counts/` folders. You can pass the ``--language` argument to select books in a given language only (*e.g.* `--language 'en'` to select books in English only).
+This will clean up the files (removing headers and footers) and populate the `text/`, `tokens/` and `counts/` folders. You can pass the ``--language`` argument to select books in a given language only (*e.g.* `--language 'en'` to select books in English only).
 
 3. Divide the data into a few paragraph-long chunks of text (ideal for generating fine-grained embeddings) and add the corresponding metadata info, save all the data in one big `jsonl` file, which we can then upload to Hugging Face:
 ```python
