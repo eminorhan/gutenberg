@@ -28,6 +28,7 @@ if __name__ == '__main__':
     parser.add_argument("--quiet", action="store_true", help="Quiet mode, do not print info, warnings, etc")
     parser.add_argument("--overwrite", action="store_true", help="Whether to overwrite any existing processed files")
     parser.add_argument("--log_file", help="Path to log file", default=".log", type=str)
+    parser.add_argument("--language", help="Language to process (e.g., 'en', 'fr'), or None for all languages", default=None, type=str)
 
     args = parser.parse_args()
     print("Args:", args)
@@ -59,8 +60,7 @@ if __name__ == '__main__':
             # language is a string representing a list of languages codes
             lang_id = ast.literal_eval(metadata.loc[PG_id, "language"])[0]
 
-            # only process English books
-            if lang_id == 'en':
+            if args.language == None:
                 # process the book: strip headers, tokenize, count
                 process_book(
                     path_to_raw_file=filename,
@@ -71,10 +71,25 @@ if __name__ == '__main__':
                     language="english",
                     log_file=args.log_file
                 )
-                print(f"Processed book {PG_id}")
+                print(f"Processed book {PG_id}; language is {lang_id}")
                 pbooks += 1
-            else:
-                print(f"Skipping book {PG_id} because it is not in English")
+            else:    
+                # only process args.language books
+                if lang_id == args.language:
+                    # process the book: strip headers, tokenize, count
+                    process_book(
+                        path_to_raw_file=filename,
+                        text_dir=args.output_text,
+                        tokens_dir=args.output_tokens,
+                        counts_dir=args.output_counts,
+                        overwrite_all=args.overwrite,
+                        language="english",
+                        log_file=args.log_file
+                    )
+                    print(f"Processed book {PG_id}")
+                    pbooks += 1
+                else:
+                    print(f"Skipping book {PG_id} because it is not in {args.language}")
 
             cbooks += 1
             if not args.quiet:

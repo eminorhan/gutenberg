@@ -11,7 +11,7 @@ This will download a copy of all UTF-8 books in the Project Gutenberg corpus and
 ```python
 python -u process_data.py
 ```
-This will select the English language subset of the corpus, clean up the files (removing headers and footers) and populate the `text/`, `tokens/` and `counts/` folders.
+This will clean up the files (removing headers and footers) and populate the `text/`, `tokens/` and `counts/` folders. You can pass the ``--language` argument to select books in a given language only (*e.g.* `--language 'en'` to select books in English only).
 
 3. Divide the data into a few paragraph-long chunks of text (ideal for generating fine-grained embeddings) and add the corresponding metadata info, save all the data in one big `jsonl` file, which we can then upload to Hugging Face:
 ```python
@@ -22,4 +22,4 @@ or alternatively save the whole document as a single record without chunking it 
 python -u create_dataset.py --wholedoc
 ```
 
-December 10, 2024 snapshot of the preprocessed dataset, containing a total of 58477 documents, together with 10M and 100M-word subsets of the full data (to be used for the BabyLM challenge), can be accessed from [this Hugging Face repository](https://huggingface.co/datasets/eminorhan/gutenberg_en_dec24).
+February 28, 2025 snapshot of the complete preprocessed PG corpus, containing a total of 73802 documents, can be accessed from [this Hugging Face repository](https://huggingface.co/datasets/eminorhan/gutenberg_feb25). The subset of the corpus containing only English language texts, containing a total of 58875 documents, can be accessed from [this Hugging Face repository](https://huggingface.co/datasets/eminorhan/gutenberg_en_feb25).
