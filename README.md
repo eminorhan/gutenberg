@@ -1,4 +1,4 @@
-## Download and preprocess a current snapshot of the English subset of the Project Gutenberg corpus
+## Download and preprocess a current snapshot of the Project Gutenberg (PG) corpus
 This repository is based on the [Gutenberg](https://github.com/pgcorpus/gutenberg) repository by Francesc Font-Clos and Martin Gerlach and can be used to download and preprocess an up-to-date snapshot of the English subset of the Project Gutenberg corpus.
 
 1. Download the most recent snapshot of the Project Gutenberg corpus: 
